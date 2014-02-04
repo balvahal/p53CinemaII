@@ -133,7 +133,7 @@ handles = guidata(handles.figure1);
 segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+_s', '_s');
 segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
 IM = double(imnormalize(imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{index})))*255);
-thresholdedImage = imread(fullfile(handles.segmentationFolder, segmentationFile));
+thresholdedImage = double(imread(fullfile(handles.segmentationFolder, segmentationFile)));
 
 set(handles.currentFrameText, 'String', num2str(index));
 set(handles.frameProgressionLabel, 'String', [num2str(index) '/' num2str(length(handles.imageFilenames))]);
@@ -615,7 +615,7 @@ position = get(hObject, 'Position');
 position = position(index);
 
 function setObjectPosition(hObject, coordinates)
-changeObjectPosition(hObject, [1:2], coordinates)
+changeObjectPosition(hObject, 1:2, coordinates)
 
 function changeObjectPosition(hObject, targetCoordinates, replacementCoordinates)
 position = get(hObject, 'Position');
@@ -695,6 +695,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
         %thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
         setappdata(handles.figure1, 'selectedCell', thresholdedImage(currentAbsolutePoint(2), currentAbsolutePoint(1)));
+        setappdata(handles.figure1, 'sourcePoint', currentAbsolutePoint);
     end
     if(get(handles.startStopTrackToogleButton, 'Value'))
         if(handles.previousCell(1) ~= -1)   % Sensitive to image scaling
@@ -733,19 +734,46 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         Objects = thresholdedImage;
         selectedPoint2 = Objects(currentAbsolutePoint(2), currentAbsolutePoint(1));
         selectedPoint1 = getappdata(handles.figure1, 'selectedCell');
-        if(selectedPoint1 > 0)
+        if(selectedPoint1 > 0 && selectedPoint2 > 0)
+            isolatedObjects = Objects == selectedPoint1 | Objects == selectedPoint2;
+            [j,i] = ind2sub(size(Objects), find(isolatedObjects));
+            isolatedObjectsModified = isolatedObjects(min(j):max(j),min(i):max(i));
             if(selectedPoint1 ~= selectedPoint2)
-                isolatedObjects = Objects == selectedPoint1 | Objects == selectedPoint2;
-                [j,i] = ind2sub(size(Objects), find(isolatedObjects));
-                isolatedObjectsModified = isolatedObjects(min(j):max(j),min(i):max(i));
-                isolatedObjectsModified = bwmorph(isolatedObjectsModified, 'bridge') * double(selectedPoint2);
-                Objects(find(isolatedObjects)) = 0;
-                Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + isolatedObjectsModified;
-                %handles.thresholdedImage(:,:,currentFrame) = Objects;
-                setappdata(handles.figure1, 'thresholdedImage', Objects);
-                setappdata(handles.figure1, 'selectedCell', selectedPoint2);
-                imageCanvas_refreshImage(handles);
+                isolatedObjectsBridged = bwmorph(isolatedObjectsModified, 'bridge') * double(selectedPoint2);
+                if(sum(logical(isolatedObjectsBridged(:)) ~= logical(isolatedObjectsModified(:))))
+                    Objects(isolatedObjects) = 0;
+                    Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + isolatedObjectsBridged;
+                end
+            else
+                sourcePoint = getappdata(handles.figure1, 'sourcePoint');
+                if(sqrt(sum((sourcePoint - currentAbsolutePoint) .^ 2)) > 5)
+                    defaultMaxima1 = sourcePoint - [min(i),min(j)];
+                    defaultMaxima2 = currentAbsolutePoint - [min(i),min(j)];
+                    IM = getappdata(handles.figure1, 'IM');
+                    IM = IM(min(j):max(j),min(i):max(i));
+                    IM(~isolatedObjectsModified) = 0;
+                    BlurredImage = imfilter(IM, fspecial('gaussian', 2, 4), 'replicate');
+                    localMaxima = imregionalmax(BlurredImage);
+                    [a,b] = ind2sub(size(localMaxima), find(localMaxima));
+                    [~, maxima1] = min((a-defaultMaxima1(1)).^2 + (b-defaultMaxima1(2)).^2);
+                    [~, maxima2] = min((a-defaultMaxima2(1)).^2 + (b-defaultMaxima2(2)).^2);
+                    if(maxima1 ~= maxima2)
+                        maximaPair = sub2ind(size(localMaxima), a([maxima1, maxima2]),b([maxima1, maxima2]));
+                    else
+                        maximaPair = sub2ind(size(localMaxima),[defaultMaxima1(2),defaultMaxima2(2)],[defaultMaxima1(1),defaultMaxima2(1)]);
+                    end
+                    localMaxima = zeros(size(localMaxima));
+                    localMaxima(maximaPair) = 1;
+                    segmented = double(watershed(imimposemin(-BlurredImage, localMaxima))) .* double(isolatedObjectsModified);
+                    segmented = bwlabel(logical(segmented)) + double(max(max(thresholdedImage))) * logical(segmented);
+                    Objects(isolatedObjects) = 0;
+                    Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + segmented;
+                end
             end
+            %handles.thresholdedImage(:,:,currentFrame) = Objects;
+            setappdata(handles.figure1, 'thresholdedImage', Objects);
+            setappdata(handles.figure1, 'selectedCell', selectedPoint2);
+            imageCanvas_refreshImage(handles);
         end
     end
 end
