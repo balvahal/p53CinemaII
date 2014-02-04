@@ -130,8 +130,10 @@ value = (index - 1) * stepSize(1);
 function handles = imageCanvas_setImage(handles, index)
 handles = guidata(handles.figure1);
 
+segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+_s', '_s');
+segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
 IM = double(imnormalize(imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{index})))*255);
-thresholdedImage = handles.thresholdedImage(:,:,index);
+thresholdedImage = imread(fullfile(handles.segmentationFolder, segmentationFile));
 
 set(handles.currentFrameText, 'String', num2str(index));
 set(handles.frameProgressionLabel, 'String', [num2str(index) '/' num2str(length(handles.imageFilenames))]);
@@ -146,16 +148,20 @@ function handles = imageCanvas_refreshImage(handles)
 % Extract all the information from appdata
 handles = guidata(handles.figure1);
 IM = getappdata(handles.figure1, 'IM');
+thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
 currentFrame = str2double(get(handles.currentFrameText, 'String'));
 transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
 selectedCell = getappdata(handles.figure1, 'selectedCell');
 
 % Generate an updated figure drawing the distinct layers
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-%thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
-thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
+%thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
 thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-selectedCellImage = thresholdedImage == selectedCell;
+if(selectedCell > 0)
+    selectedCellImage = thresholdedImage == selectedCell;
+else
+    selectedCellImage = zeros(size(thresholdedImage));
+end
 if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
     thresholdedImage = imfill(bwperim(thresholdedImage), [transformedPoint(2), transformedPoint(1)]);
 else
@@ -374,7 +380,6 @@ handles.totalSize = size(IM);
 maxPointsPerImage = 1000;
 handles.annotationLayers.pointLayer = repmat(struct('n', maxPointsPerImage, 'point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'version', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
 handles.annotationLayers.trackLayer = repmat(struct('point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'cell', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
-handles.thresholdedImage = double(zeros(size(IM,1), size(IM,2), handles.dataLength));
 
 currentAxesUnits = get(handles.imageCanvas, 'Units');
 set(handles.imageCanvas, 'Units', 'Pixels');
@@ -427,9 +432,19 @@ set(handles.startStopTrackToogleButton, 'Value', 0);
 
 set(handles.progressBar, 'Value', 0);
 set(handles.progressBar, 'Maximum', length(handles.imageFilenames));
-for i=1:400:length(handles.imageFilenames)
-    IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
-    handles.thresholdedImage(:,:,handles.imageTimepoints(i)) = singleCellFollowing_imageProcessing(IM);
+segmentationFolder = fullfile(handles.sourcePath, handles.selectedGroup, 'segmentation');
+if(~exist(segmentationFolder, 'dir'))
+    mkdir(segmentationFolder);
+end
+handles.segmentationFolder = segmentationFolder;
+for i=1:1:length(handles.imageFilenames)
+    segmentationFile = regexprep(handles.imageFilenames{i}, '_w(\d+)\w+_s', '_s');
+    segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
+    if(~exist(fullfile(segmentationFolder, segmentationFile), 'file'))
+        IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
+        segmentedImage = singleCellFollowing_imageProcessing(IM);
+        imwrite(imnormalize(segmentedImage), fullfile(segmentationFolder, segmentationFile));
+    end
     set(handles.progressBar, 'Value', i);
     drawnow;
     disp(get(handles.progressBar, 'Value'));
@@ -677,8 +692,8 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     currentAbsolutePoint = transformedPoint + double(handles.imorigin) - 1; % Sensitive to image scaling
     currentFrame = str2double(get(handles.currentFrameText, 'String'));
     if(getappdata(handles.figure1, 'isEditing'))
-        %thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
-        thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
+        thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
+        %thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
         setappdata(handles.figure1, 'selectedCell', thresholdedImage(currentAbsolutePoint(2), currentAbsolutePoint(1)));
     end
     if(get(handles.startStopTrackToogleButton, 'Value'))
@@ -713,23 +728,24 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     currentAbsolutePoint = transformedPoint + double(handles.imorigin) - 1; % Sensitive to image scaling
     currentFrame = str2double(get(handles.currentFrameText, 'String'));
     if(getappdata(handles.figure1, 'isEditing'))
-        %thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
-        thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
+        thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
+        %thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
         Objects = thresholdedImage;
         selectedPoint2 = Objects(currentAbsolutePoint(2), currentAbsolutePoint(1));
         selectedPoint1 = getappdata(handles.figure1, 'selectedCell');
-        if(selectedPoint2 > 0 && selectedPoint1 > 0)
+        if(selectedPoint1 > 0)
             if(selectedPoint1 ~= selectedPoint2)
                 isolatedObjects = Objects == selectedPoint1 | Objects == selectedPoint2;
                 [j,i] = ind2sub(size(Objects), find(isolatedObjects));
                 isolatedObjectsModified = isolatedObjects(min(j):max(j),min(i):max(i));
-                isolatedObjectsModified = bwmorph(isolatedObjectsModified, 'bridge') * selectedPoint1;
+                isolatedObjectsModified = bwmorph(isolatedObjectsModified, 'bridge') * double(selectedPoint2);
                 Objects(find(isolatedObjects)) = 0;
-                Objects(min(j):max(j),min(i):max(i)) = Objects(min(j):max(j),min(i):max(i)) + isolatedObjectsModified;
-                handles.thresholdedImage(:,:,currentFrame) = Objects;
-                %setappdata(handles.figure1, 'thresholdedImage', Objects);
+                Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + isolatedObjectsModified;
+                %handles.thresholdedImage(:,:,currentFrame) = Objects;
+                setappdata(handles.figure1, 'thresholdedImage', Objects);
+                setappdata(handles.figure1, 'selectedCell', selectedPoint2);
+                imageCanvas_refreshImage(handles);
             end
         end
     end
 end
-guidata(hObject, handles);
