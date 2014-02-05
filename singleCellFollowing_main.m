@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 03-Feb-2014 17:26:23
+% Last Modified by GUIDE v2.5 04-Feb-2014 18:23:48
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -90,7 +90,6 @@ organizeLayout(handles);
 axes(handles.imageCanvas);
 image(zeros(1,1));
 colormap('gray');
-lh = addlistener(handles.movieSlider, 'Value', 'PostSet', @(source, event) imageCanvas_setImage(handles, getSliderIndex(handles)));
 
 guidata(hObject, handles);
 
@@ -130,10 +129,15 @@ value = (index - 1) * stepSize(1);
 function handles = imageCanvas_setImage(handles, index)
 handles = guidata(handles.figure1);
 
+if(getappdata(handles.figure1, 'segmentationEdited'))
+    imwrite(getappdata(handles.figure1, 'thresholdedImage'), fullfile(handles.segmentationFolder, getappdata(handles.figure1, 'segmentationFile')));
+end
+setappdata(handles.figure1, 'segmentationEdited', 0);
+
 segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+_s', '_s');
 segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
 IM = double(imnormalize(imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{index})))*255);
-thresholdedImage = double(imread(fullfile(handles.segmentationFolder, segmentationFile)));
+thresholdedImage = bwlabel(double(imread(fullfile(handles.segmentationFolder, segmentationFile))));
 
 set(handles.currentFrameText, 'String', num2str(index));
 set(handles.frameProgressionLabel, 'String', [num2str(index) '/' num2str(length(handles.imageFilenames))]);
@@ -142,20 +146,29 @@ set(handles.currentFilenameLabel, 'string', handles.imageFilenames{index});
 setappdata(handles.figure1, 'IM', IM);
 setappdata(handles.figure1, 'thresholdedImage', thresholdedImage);
 setappdata(handles.figure1, 'selectedCell', -1);
-imageCanvas_refreshImage(handles);
+setappdata(handles.figure1, 'segmentationFile', segmentationFile);
 
-function handles = imageCanvas_refreshImage(handles)
-% Extract all the information from appdata
-handles = guidata(handles.figure1);
-IM = getappdata(handles.figure1, 'IM');
-thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
-currentFrame = str2double(get(handles.currentFrameText, 'String'));
 transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
-selectedCell = getappdata(handles.figure1, 'selectedCell');
+subImage = prepareOverlayImage(handles);
 
 % Generate an updated figure drawing the distinct layers
+set(handles.implot, 'CData', subImage);
+
+function handles = imageCanvas_refreshImage(handles)
+handles = guidata(handles.figure1);
+transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
+subImage = prepareOverlayImage(handles);
+% Generate an updated figure drawing the distinct layers
+set(handles.implot, 'CData', subImage);
+set(handles.axisH, 'XData', [transformedPoint(1), transformedPoint(1)], 'YData', ylim);
+set(handles.axisV, 'YData', [transformedPoint(2), transformedPoint(2)], 'XData', xlim);
+
+function subImage = prepareOverlayImage(handles)
+IM = getappdata(handles.figure1, 'IM');
+thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
+transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
+selectedCell = getappdata(handles.figure1, 'selectedCell');
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-%thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
 thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
 if(selectedCell > 0)
     selectedCellImage = thresholdedImage == selectedCell;
@@ -167,11 +180,10 @@ if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
 else
     thresholdedImage = bwperim(thresholdedImage);
 end
+%greenMask = cat(3, ones(size(subImage)) * 0.3, ones(size(subImage)) * 1, ones(size(subImage)) * 0.3) .* im2rgb(thresholdedImage);
+%redMask = cat(3, ones(size(subImage)) * 1, ones(size(subImage)) * 0.2, ones(size(subImage)) * 0.3) .* im2rgb(selectedCellImage);
 subImage = imoverlay(im2rgb(subImage), thresholdedImage, [0.3, 1, 0.3]);
 subImage = imoverlay(subImage, selectedCellImage, [1, 0.2, 0.1]);
-set(handles.implot, 'CData', subImage);
-set(handles.axisH, 'XData', [transformedPoint(1), transformedPoint(1)], 'YData', ylim);
-set(handles.axisV, 'YData', [transformedPoint(2), transformedPoint(2)], 'XData', xlim);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -440,15 +452,17 @@ handles.segmentationFolder = segmentationFolder;
 for i=1:1:length(handles.imageFilenames)
     segmentationFile = regexprep(handles.imageFilenames{i}, '_w(\d+)\w+_s', '_s');
     segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
-    if(~exist(fullfile(segmentationFolder, segmentationFile), 'file'))
+    if(~exist(fullfile(segmentationFolder, segmentationFile), 'file') || get(handles.preprocessCheckbox, 'Value'))
         IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
         segmentedImage = singleCellFollowing_imageProcessing(IM);
-        imwrite(imnormalize(segmentedImage), fullfile(segmentationFolder, segmentationFile));
+        imwrite(uint16(segmentedImage), fullfile(segmentationFolder, segmentationFile));
     end
     set(handles.progressBar, 'Value', i);
     drawnow;
-    disp(get(handles.progressBar, 'Value'));
 end
+setappdata(handles.figure1, 'segmentationEdited', 0);
+
+handles.lh = addlistener(handles.movieSlider, 'ContinuousValueChange', @(source, event) imageCanvas_setImage(handles, getSliderIndex(handles)));
 guidata(hObject, handles);
 
 organizeLayout(handles)
@@ -682,7 +696,7 @@ function imageCanvas_ButtonDownFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 handles = guidata(handles.figure1);
-if(strcmp(get(handles.movieSlider, 'Enable'), 'off'))
+if(strcmp(get(handles.movieSlider, 'Enable'), 'off') || handles.imageScanningMode)
     return;
 end
 currentPoint = get(handles.figure1, 'CurrentPoint');
@@ -691,7 +705,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     transformedPoint = getTransformedLocation(currentPoint, imageCanvasPosition, handles.imageCanvas);
     currentAbsolutePoint = transformedPoint + double(handles.imorigin) - 1; % Sensitive to image scaling
     currentFrame = str2double(get(handles.currentFrameText, 'String'));
-    if(getappdata(handles.figure1, 'isEditing'))
+    if(getappdata(handles.figure1, 'isEditing') && ~handles.imageScanningMode)
         thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
         %thresholdedImage = handles.thresholdedImage(:,:,currentFrame);
         setappdata(handles.figure1, 'selectedCell', thresholdedImage(currentAbsolutePoint(2), currentAbsolutePoint(1)));
@@ -719,7 +733,7 @@ function figure1_WindowButtonUpFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 handles = guidata(handles.figure1);
-if(strcmp(get(handles.movieSlider, 'Enable'), 'off'))
+if(strcmp(get(handles.movieSlider, 'Enable'), 'off') || handles.imageScanningMode)
     return;
 end
 currentPoint = get(handles.figure1, 'CurrentPoint');
@@ -743,6 +757,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 if(sum(logical(isolatedObjectsBridged(:)) ~= logical(isolatedObjectsModified(:))))
                     Objects(isolatedObjects) = 0;
                     Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + isolatedObjectsBridged;
+                    setappdata(handles.figure1, 'segmentationEdited', 1);
                 end
             else
                 sourcePoint = getappdata(handles.figure1, 'sourcePoint');
@@ -752,22 +767,23 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                     IM = getappdata(handles.figure1, 'IM');
                     IM = IM(min(j):max(j),min(i):max(i));
                     IM(~isolatedObjectsModified) = 0;
-                    BlurredImage = imfilter(IM, fspecial('gaussian', 2, 4), 'replicate');
-                    localMaxima = imregionalmax(BlurredImage);
-                    [a,b] = ind2sub(size(localMaxima), find(localMaxima));
-                    [~, maxima1] = min((a-defaultMaxima1(1)).^2 + (b-defaultMaxima1(2)).^2);
-                    [~, maxima2] = min((a-defaultMaxima2(1)).^2 + (b-defaultMaxima2(2)).^2);
-                    if(maxima1 ~= maxima2)
-                        maximaPair = sub2ind(size(localMaxima), a([maxima1, maxima2]),b([maxima1, maxima2]));
-                    else
-                        maximaPair = sub2ind(size(localMaxima),[defaultMaxima1(2),defaultMaxima2(2)],[defaultMaxima1(1),defaultMaxima2(1)]);
-                    end
-                    localMaxima = zeros(size(localMaxima));
+                    BlurredImage = imfilter(IM, fspecial('gaussian', 10, 4), 'replicate');
+                    %localMaxima = imregionalmax(BlurredImage);
+                    %[a,b] = ind2sub(size(localMaxima), find(localMaxima));
+                    %[~, maxima1] = min((a-defaultMaxima1(1)).^2 + (b-defaultMaxima1(2)).^2);
+                    %[~, maxima2] = min((a-defaultMaxima2(1)).^2 + (b-defaultMaxima2(2)).^2);
+                    %if(maxima1 ~= maxima2)
+                    %    maximaPair = sub2ind(size(localMaxima), a([maxima1, maxima2]),b([maxima1, maxima2]));
+                    %else
+                        maximaPair = sub2ind(size(BlurredImage),[defaultMaxima1(2),defaultMaxima2(2)],[defaultMaxima1(1),defaultMaxima2(1)]);
+                    %end
+                    localMaxima = zeros(size(BlurredImage));
                     localMaxima(maximaPair) = 1;
                     segmented = double(watershed(imimposemin(-BlurredImage, localMaxima))) .* double(isolatedObjectsModified);
                     segmented = bwlabel(logical(segmented)) + double(max(max(thresholdedImage))) * logical(segmented);
                     Objects(isolatedObjects) = 0;
                     Objects(min(j):max(j),min(i):max(i)) = double(Objects(min(j):max(j),min(i):max(i))) + segmented;
+                    setappdata(handles.figure1, 'segmentationEdited', 1);
                 end
             end
             %handles.thresholdedImage(:,:,currentFrame) = Objects;
@@ -777,3 +793,23 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         end
     end
 end
+
+
+% --- Executes on button press in segmentButton.
+function segmentButton_Callback(hObject, eventdata, handles)
+% hObject    handle to segmentButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+IM = getappdata(handles.figure1, 'IM');
+segmentedImage = singleCellFollowing_imageProcessing(IM);
+setappdata(handles.figure1, 'thresholdedImage', segmentedImage);
+imageCanvas_refreshImage(handles);
+
+
+% --- Executes on button press in preprocessCheckbox.
+function preprocessCheckbox_Callback(hObject, eventdata, handles)
+% hObject    handle to preprocessCheckbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of preprocessCheckbox

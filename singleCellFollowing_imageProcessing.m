@@ -1,14 +1,23 @@
-function [thresholdedImage, localMaxima] = singleCellFollowing_imageProcessing(IM)
+function [finalSegmentation, localMaxima] = singleCellFollowing_imageProcessing(IM)
 BlurredImage = imfilter(IM, fspecial('gaussian', 10, 4));
 edgeImage = imfill(edge(BlurredImage, 'canny'), 'holes');
 threshold = quantile(BlurredImage(edgeImage), 0.05);
 thresholdedImage = edgeImage + logical(BlurredImage > threshold);
 thresholdedImage = imopen(thresholdedImage, strel('disk',3));
+
+thresholdedImage = bwlabel(thresholdedImage);
+props = regionprops(thresholdedImage, 'Solidity');
+firstPassSegmentation = ismember(thresholdedImage, find([props.Solidity] > 0.97));
+thresholdedImage = logical(thresholdedImage) & ~firstPassSegmentation;
+
 BlurredImage(~thresholdedImage) = 0;
 localMaxima = imregionalmax(BlurredImage);
-%localMaxima = ind2sub(size(IM), find(localMaxima));
-thresholdedImage = bwlabel(thresholdedImage);
-props = regionprops(thresholdedImage, 'Area');
-thresholdedImage = ismember(thresholdedImage, find([props.Area] > 100));
-thresholdedImage = double(watershed(imimposemin(-BlurredImage, localMaxima))) .* thresholdedImage;
+secondPassSegmentation = double(watershed(imimposemin(-BlurredImage, localMaxima))) .* thresholdedImage;
+% 
+% DistanceTransformedImage = bwdist(~thresholdedImage);
+% localMaxima = imregionalmax(DistanceTransformedImage);
+% secondPassSegmentation = double(watershed(imimposemin(-DistanceTransformedImage, localMaxima))) .* thresholdedImage;
+
+finalSegmentation = firstPassSegmentation | secondPassSegmentation;
+finalSegmentation = bwlabel(finalSegmentation);
 end
