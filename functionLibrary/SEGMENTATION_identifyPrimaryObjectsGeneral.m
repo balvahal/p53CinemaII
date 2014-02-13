@@ -22,7 +22,7 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     SizeOfSmoothingFilter=MinDiameter;
     BlurredImage = imfilter(OriginalImage_normalized, fspecial('gaussian', round(SizeOfSmoothingFilter), round(SizeOfSmoothingFilter/3.5)));
    
-    Objects = logical(im2bw(OriginalImage_normalized, graythresh(BlurredImage)) + edge(OriginalImage_normalized, 'canny'));
+    Objects = logical(im2bw(OriginalImage_normalized, graythresh(OriginalImage_normalized)) + edge(OriginalImage_normalized, 'canny'));
     Objects = imfill(Objects, 'holes');
     Objects = imopen(Objects, strel('disk', 2));
     

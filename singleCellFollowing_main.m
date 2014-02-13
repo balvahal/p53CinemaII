@@ -55,8 +55,8 @@ function singleCellFollowing_main_OpeningFcn(hObject, eventdata, handles, vararg
 % Choose default command line output for singleCellFollowing_main
 handles.output = hObject;
 
-handles.maxWidth = 670;
-handles.maxHeight = 512;
+handles.maxWidth = 700;
+handles.maxHeight = 550;
 handles.minWidth = 50;
 handles.minHeight = 50;
 handles.marginLevel1 = 10;
@@ -134,9 +134,9 @@ if(getappdata(handles.figure1, 'segmentationEdited'))
 end
 setappdata(handles.figure1, 'segmentationEdited', 0);
 
-segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+_s', '_s');
+segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+.*_s', '_s');
 segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
-IM = double(imnormalize(imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{index})))*255);
+IM = double(imnormalize(imread(fullfile(handles.rawdataFolder, handles.imageFilenames{index})))*255);
 thresholdedImage = bwlabel(double(imread(fullfile(handles.segmentationFolder, segmentationFile))));
 
 set(handles.currentFrameText, 'String', num2str(index));
@@ -153,6 +153,7 @@ subImage = prepareOverlayImage(handles);
 
 % Generate an updated figure drawing the distinct layers
 set(handles.implot, 'CData', subImage);
+drawnow;
 
 function handles = imageCanvas_refreshImage(handles)
 handles = guidata(handles.figure1);
@@ -162,6 +163,7 @@ subImage = prepareOverlayImage(handles);
 set(handles.implot, 'CData', subImage);
 set(handles.axisH, 'XData', [transformedPoint(1), transformedPoint(1)], 'YData', ylim);
 set(handles.axisV, 'YData', [transformedPoint(2), transformedPoint(2)], 'XData', xlim);
+drawnow;
 
 function subImage = prepareOverlayImage(handles)
 IM = getappdata(handles.figure1, 'IM');
@@ -383,7 +385,11 @@ handles.selectedGroup = selectedGroup;
 handles.selectedChannel = selectedChannel;
 handles.selectedPosition = selectedPosition;
 
-IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{1}));
+rawdataFolder = fullfile(handles.sourcePath, 'RAW_DATA');
+handles.rawdataFolder = rawdataFolder;
+
+%IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{1}));
+IM = imread(fullfile(handles.rawdataFolder, handles.imageFilenames{1}));
 handles.totalSize = size(IM);
 
 maxPointsPerImage = 1000;
@@ -394,7 +400,7 @@ currentAxesUnits = get(handles.imageCanvas, 'Units');
 set(handles.imageCanvas, 'Units', 'Pixels');
 canvasPosition = get(handles.imageCanvas, 'Position');
 handles.canvasSize = [canvasPosition(4), canvasPosition(3)];
-definedSize = [min(size(IM,2), handles.maxHeight), min(size(IM,1), handles.maxWidth)]; 
+definedSize = [min(size(IM,1), handles.maxHeight), min(size(IM,2), handles.maxWidth)]; 
 handles.definedSizePixels = definedSize; 
 canvasPosition(3) = definedSize(2);
 canvasPosition(4) = definedSize(1);
@@ -441,16 +447,17 @@ set(handles.startStopTrackToogleButton, 'Value', 0);
 
 set(handles.progressBar, 'Value', 0);
 set(handles.progressBar, 'Maximum', length(handles.imageFilenames));
-segmentationFolder = fullfile(handles.sourcePath, handles.selectedGroup, 'segmentation');
+segmentationFolder = fullfile(handles.sourcePath, 'SEGMENT_DATA');
 if(~exist(segmentationFolder, 'dir'))
     mkdir(segmentationFolder);
 end
 handles.segmentationFolder = segmentationFolder;
 for i=1:1:length(handles.imageFilenames)
-    segmentationFile = regexprep(handles.imageFilenames{i}, '_w(\d+)\w+_s', '_s');
+    segmentationFile = regexprep(handles.imageFilenames{i}, '_w(\d+)\w+.*_s', '_s');
     segmentationFile = regexprep(segmentationFile, '\.\w+', '_segment.png');
     if(~exist(fullfile(segmentationFolder, segmentationFile), 'file') || get(handles.preprocessCheckbox, 'Value'))
-        IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
+        %IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
+        IM = imread(fullfile(handles.rawdataFolder, handles.imageFilenames{i}));
         segmentedImage = singleCellFollowing_imageProcessing(IM);
         imwrite(uint16(segmentedImage), fullfile(segmentationFolder, segmentationFile));
     end
