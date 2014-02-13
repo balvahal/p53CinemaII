@@ -169,22 +169,19 @@ thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
 transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
 selectedCell = getappdata(handles.figure1, 'selectedCell');
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-if(selectedCell > 0)
-    selectedCellImage = thresholdedImage == selectedCell;
-else
-    selectedCellImage = zeros(size(thresholdedImage));
-end
-if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-    thresholdedImage = imfill(bwperim(thresholdedImage), [transformedPoint(2), transformedPoint(1)]);
-else
-    thresholdedImage = bwperim(thresholdedImage);
-end
-%greenMask = cat(3, ones(size(subImage)) * 0.3, ones(size(subImage)) * 1, ones(size(subImage)) * 0.3) .* im2rgb(thresholdedImage);
-%redMask = cat(3, ones(size(subImage)) * 1, ones(size(subImage)) * 0.2, ones(size(subImage)) * 0.3) .* im2rgb(selectedCellImage);
-subImage = imoverlay(im2rgb(subImage), thresholdedImage, [0.3, 1, 0.3]);
-subImage = imoverlay(subImage, selectedCellImage, [1, 0.2, 0.1]);
-
+ thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
+% subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
+% if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
+%     highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
+%     greenMask = cat(3, ones(size(highlightedCell)) - highlightedCell * 0.7, ones(size(highlightedCell)), ones(size(highlightedCell)) - 0.7 * highlightedCell) * 255;
+%     subImage = imnormalize(double(subImage) .* greenMask);
+% end
+% if(selectedCell > 0)
+%     selectedCellImage = thresholdedImage == selectedCell;
+%     redMask = cat(3, ones(size(selectedCellImage)) - 0 * selectedCellImage, ones(size(selectedCellImage)) - 0.8 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
+%     subImage = double(subImage) .* redMask;
+%     subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
+% end
 
 % --- Executes during object creation, after setting all properties.
 function movieSlider_CreateFcn(hObject, eventdata, handles)
