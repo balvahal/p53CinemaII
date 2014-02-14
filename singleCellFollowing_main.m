@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 04-Feb-2014 18:23:48
+% Last Modified by GUIDE v2.5 13-Feb-2014 14:54:43
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -817,3 +817,18 @@ function preprocessCheckbox_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of preprocessCheckbox
+
+
+% --- Executes on scroll wheel click while the figure is in focus.
+function figure1_WindowScrollWheelFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  structure with the following fields (see FIGURE)
+%	VerticalScrollCount: signed integer indicating direction and number of clicks
+%	VerticalScrollAmount: number of lines scrolled for each click
+% handles    structure with handles and user data (see GUIDATA)
+if(strcmp(get(handles.movieSlider, 'Enable'), 'off') || handles.imageScanningMode)
+    return;
+end
+currentIndex = str2double(get(handles.currentFrameText, 'String'));
+nextIndex = min(max(currentIndex + eventdata.VerticalScrollCount,1),handles.dataLength);
+imageCanvas_setImage(handles, nextIndex);
