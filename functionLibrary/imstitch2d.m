@@ -5,13 +5,15 @@ function [offset, correlation, image] = imstitch2d(im1, im2, isHorizontal)
         im2 = temp;
     end
     
-    targetTrimming = 50;
+    % Generate a subimage that will serve as a mask for scanning in the y
+    % direction
+    targetTrimming = size(im2,1) * 0.2; % Percentage
     minimumOverlap = uint16(min(size(im1,1) - targetTrimming, size(im2,1)-targetTrimming));
     trimming = (size(im2,1) - minimumOverlap)/2;
     im2SubImage = im2(trimming:(size(im2,1)-trimming),:);
     minimumOverlap = size(im2SubImage,1);
 
-    potentialOffsetsX = 20:(size(im1,2)/2);
+    potentialOffsetsX = 1:(size(im1,2)/8);
     potentialOffsetsY = 1:(size(im1,1)-size(im2SubImage,1));
     
     correlation = zeros(length(potentialOffsetsY), length(potentialOffsetsX));
@@ -19,8 +21,8 @@ function [offset, correlation, image] = imstitch2d(im1, im2, isHorizontal)
     progress = 0;
     for i=1:length(potentialOffsetsX)
         if(i/length(potentialOffsetsX) > progress)
-            progress = progress + 0.1;
             fprintf('%d ', uint16(progress * 100));
+            progress = progress + 0.1;
         end
         offsetX = potentialOffsetsX(i);
         for j=1:length(potentialOffsetsY)
