@@ -9,6 +9,7 @@
 classdef p53CinemaDataSourceObject < handle
     properties
         manualTrackingData = containers.Map;
+        motherLineage = containers.Map;
     end
     properties (SetObservable)
         
