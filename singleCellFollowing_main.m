@@ -171,30 +171,17 @@ transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figu
 selectedCell = getappdata(handles.figure1, 'selectedCell');
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
 thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-subImage = uint8(im2rgb(subImage) * 255);
-%subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
+subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
 if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
     highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
-    greenMask = cat(3, ones(size(highlightedCell)) - highlightedCell * 0.7, ones(size(highlightedCell)), ones(size(highlightedCell)) - 0.7 * highlightedCell) * 255;
-    subImage = imnormalize(double(subImage) .* greenMask);
+    greenMask = cat(3, ones(size(highlightedCell)) + highlightedCell * -0.5, ones(size(highlightedCell)) + highlightedCell * 1.3, ones(size(highlightedCell)) + highlightedCell * -0.5);
+    subImage = im2uint8(imnormalize(subImage) .* greenMask);
 end
 if(selectedCell > 0)
     selectedCellImage = thresholdedImage == selectedCell;
-    redMask = cat(3, ones(size(selectedCellImage)) - 0 * selectedCellImage, ones(size(selectedCellImage)) - 0.8 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
-    subImage = double(subImage) .* redMask;
+    redMask = cat(3, ones(size(selectedCellImage)) + 1 * selectedCellImage, ones(size(selectedCellImage)) - 0.5 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
+    subImage = imnormalize(subImage) .* redMask;
     subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
-    subImage = imoverlay(imnormalize(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
-    if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-        highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
-        greenMask = cat(3, ones(size(highlightedCell)) + highlightedCell * -0.5, ones(size(highlightedCell)) + highlightedCell * 1.3, ones(size(highlightedCell)) + highlightedCell * -0.5);
-        subImage = im2uint8(imnormalize(subImage) .* greenMask);
-    end
-    if(selectedCell > 0)
-        selectedCellImage = thresholdedImage == selectedCell;
-        redMask = cat(3, ones(size(selectedCellImage)) + 1 * selectedCellImage, ones(size(selectedCellImage)) - 0.5 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
-        subImage = imnormalize(subImage) .* redMask;
-        subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
-    end
 end
 
 % --- Executes during object creation, after setting all properties.
