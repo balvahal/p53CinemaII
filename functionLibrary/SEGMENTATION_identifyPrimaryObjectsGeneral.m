@@ -31,17 +31,17 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     primarySegmentation = ismember(ObjectsLabeled, find([props.Solidity] >= 0.9));
     
     Objects = Objects & ~primarySegmentation;
-    ObjectsLabeled = bwlabel(Objects);
-    beanshapes = zeros(1, length(props));
-    props = regionprops(ObjectsLabeled, 'FilledImage');
-    for k=1:length(props)
-        convexHull = bwconvhull(props(k).FilledImage) & ~props(k).FilledImage;
-        convexHull = imopen(convexHull, strel('square', 3));
-        components = bwconncomp(convexHull);
-        beanshapes(k) = components.NumObjects;
-    end
-    primarySegmentation = primarySegmentation | ismember(ObjectsLabeled, find(beanshapes < 2));
-    Objects = Objects & ~primarySegmentation;
+%     ObjectsLabeled = bwlabel(Objects);
+%     beanshapes = zeros(1, length(props));
+%     props = regionprops(ObjectsLabeled, 'FilledImage');
+%     for k=1:length(props)
+%         convexHull = bwconvhull(props(k).FilledImage) & ~props(k).FilledImage;
+%         convexHull = imopen(convexHull, strel('square', 3));
+%         components = bwconncomp(convexHull);
+%         beanshapes(k) = components.NumObjects;
+%     end
+%     primarySegmentation = primarySegmentation | ismember(ObjectsLabeled, find(beanshapes < 2));
+%     Objects = Objects & ~primarySegmentation;
     
     % IDENTIFY LOCAL MAXIMA IN THE INTENSITY OF DISTANCE TRANSFORMED IMAGE    
     if strcmp(p.Results.LocalMaximaType, 'Intensity')
