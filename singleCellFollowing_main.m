@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 13-Feb-2014 14:54:43
+% Last Modified by GUIDE v2.5 14-Feb-2014 11:15:25
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -171,19 +171,19 @@ thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
 transformedPoint = [getappdata(handles.figure1, 'xloc'), getappdata(handles.figure1, 'yloc')];
 selectedCell = getappdata(handles.figure1, 'selectedCell');
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
- thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-% subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
-% if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-%     highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
-%     greenMask = cat(3, ones(size(highlightedCell)) - highlightedCell * 0.7, ones(size(highlightedCell)), ones(size(highlightedCell)) - 0.7 * highlightedCell) * 255;
-%     subImage = imnormalize(double(subImage) .* greenMask);
-% end
-% if(selectedCell > 0)
-%     selectedCellImage = thresholdedImage == selectedCell;
-%     redMask = cat(3, ones(size(selectedCellImage)) - 0 * selectedCellImage, ones(size(selectedCellImage)) - 0.8 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
-%     subImage = double(subImage) .* redMask;
-%     subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
-% end
+thresholdedImage = thresholdedImage(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
+subImage = imoverlay(imnormalize(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
+if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
+    highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
+    greenMask = cat(3, ones(size(highlightedCell)) + highlightedCell * -0.5, ones(size(highlightedCell)) + highlightedCell * 1.3, ones(size(highlightedCell)) + highlightedCell * -0.5);
+    subImage = im2uint8(imnormalize(subImage) .* greenMask);
+end
+if(selectedCell > 0)
+    selectedCellImage = thresholdedImage == selectedCell;
+    redMask = cat(3, ones(size(selectedCellImage)) + 1 * selectedCellImage, ones(size(selectedCellImage)) - 0.5 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
+    subImage = imnormalize(subImage) .* redMask;
+    subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
+end
 
 % --- Executes during object creation, after setting all properties.
 function movieSlider_CreateFcn(hObject, eventdata, handles)
@@ -408,7 +408,7 @@ set(handles.imageCanvas, 'Position', canvasPosition);
 set(handles.imageCanvas, 'Units', currentAxesUnits);
 
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
-handles.implot = image(subImage);
+handles.implot = image(uint8(subImage));
 hold(handles.imageCanvas);
 handles.axisH = plot(xlim, [uint16(size(subImage,2)/2), uint16(size(subImage,2)/2)]);
 handles.axisV = plot([uint16(size(subImage,1)/2), uint16(size(subImage,1)/2)], ylim);
@@ -798,7 +798,6 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     end
 end
 
-
 % --- Executes on button press in segmentButton.
 function segmentButton_Callback(hObject, eventdata, handles)
 % hObject    handle to segmentButton (see GCBO)
@@ -832,3 +831,10 @@ end
 currentIndex = str2double(get(handles.currentFrameText, 'String'));
 nextIndex = min(max(currentIndex + eventdata.VerticalScrollCount,1),handles.dataLength);
 imageCanvas_setImage(handles, nextIndex);
+
+
+% --- Executes on mouse press over figure background.
+function figure1_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to figure1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
