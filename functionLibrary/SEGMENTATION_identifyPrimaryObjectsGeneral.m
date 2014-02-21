@@ -31,7 +31,13 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     primarySegmentation = ismember(ObjectsLabeled, find([props.Solidity] >= 0.95));
 
     props = bwconncomp(primarySegmentation);
-    SizeOfSmoothingFilter = round(2 * sqrt(median(cellfun(@length, props.PixelIdxList))) / pi);
+    % Kyle: I found that I'd get an error if the region props did not
+    % return any objects, i.e. the image had no cells in the field of view.
+    if  isnan(props.NumObjects) || props.NumObjects == 0
+        SizeOfSmoothingFilter = 10;
+    else
+        SizeOfSmoothingFilter = round(2 * sqrt(median(cellfun(@length, props.PixelIdxList))) / pi);
+    end
     MaximaSuppressionSize = round(0.5 * SizeOfSmoothingFilter);
     MaximaMask = getnhood(strel('disk', MaximaSuppressionSize));
     
