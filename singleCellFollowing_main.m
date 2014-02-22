@@ -55,8 +55,8 @@ function singleCellFollowing_main_OpeningFcn(hObject, eventdata, handles, vararg
 % Choose default command line output for singleCellFollowing_main
 handles.output = hObject;
 
-handles.maxWidth = 700;
-handles.maxHeight = 550;
+handles.maxWidth = 400;
+handles.maxHeight = 400;
 handles.minWidth = 50;
 handles.minHeight = 50;
 handles.marginLevel1 = 10;
@@ -136,13 +136,15 @@ setappdata(handles.figure1, 'segmentationEdited', 0);
 
 segmentationFile = regexprep(handles.imageFilenames{index}, '_w(\d+)\w+.*_s', '_s');
 segmentationFile = regexprep(segmentationFile, '\.\w+', '\.PNG');
-IM = double(imnormalize(imread(fullfile(handles.rawdataFolder, handles.imageFilenames{index})))*255);
-
+if(strcmp(getCurrentPopupString(handles.channelToogleSelection), getCurrentPopupString(handles.channelSelection)))
+    % SPEED UP ATTEMPT: load image from preallocated array
+    IM = handles.imageSequence(:,:,index);
+else
+    IM = im2uint8(imnormalize(imread(fullfile(handles.rawdataFolder, handles.imageFilenames{index}))));
+end
+    
+% IM = im2uint8(imnormalize(imread(fullfile(handles.rawdataFolder, handles.imageFilenames{index}))));
 thresholdedImage = bwlabel(double(imread(fullfile(handles.segmentationFolder, segmentationFile))));
-% props = regionprops(thresholdedImage, 'Area');
-% thresholdedImage = ismember(thresholdedImage, find([props.Area] > 200));
-% thresholdedImage = bwlabel(thresholdedImage);
-% setappdata(handles.figure1, 'segmentationEdited', 1);
 
 set(handles.currentFrameText, 'String', num2str(index));
 set(handles.frameProgressionLabel, 'String', [num2str(index) '/' num2str(length(handles.imageFilenames))]);
@@ -162,7 +164,9 @@ set(handles.implot, 'CData', subImage);
 %set(handles.highlightLayer, 'AlphaData', highlightedImage);
 %set(handles.selectionLayer, 'AlphaData', selectedImage);
 
-%drawnow;
+if(~get(handles.startStopTrackToogleButton, 'Value'))
+    drawnow;
+end
 
 function handles = imageCanvas_refreshImage(handles)
 handles = guidata(handles.figure1);
@@ -180,7 +184,9 @@ set(handles.implot, 'CData', subImage);
 %set(handles.highlightLayer, 'AlphaData', highlightedImage);
 %set(handles.selectionLayer, 'AlphaData', selectedImage);
 
-%drawnow;
+% if(~get(handles.startStopTrackToogleButton, 'Value'))
+%     drawnow;
+% end
 
 function [subImage] = prepareOverlayImage(handles)
 currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
@@ -198,11 +204,18 @@ if(~isempty(trackedCentroids))
 else
     trackedCellImage = zeros(size(IM));
 end
+cellularCentroid = handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:);
+if(cellularCentroid(2) > 0)
+    trackedCell = thresholdedImage == thresholdedImage(cellularCentroid(2), cellularCentroid(1));
+else
+    trackedCell = zeros(size(thresholdedImage));
+end
 
 subsettingRectangle = {handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1)};
 subImage = IM(subsettingRectangle{1}, subsettingRectangle{2});
 thresholdedImage = thresholdedImage(subsettingRectangle{1}, subsettingRectangle{2});
 trackedCellImage = trackedCellImage(subsettingRectangle{1}, subsettingRectangle{2});
+trackedCell = trackedCell(subsettingRectangle{1}, subsettingRectangle{2});
 
 % DISPLAY OPTION 0
 % highglightedImage = bwperim(thresholdedImage);
@@ -234,12 +247,7 @@ if(selectedCell > 0)
     subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
 end
 if(sum(sum(trackedCellImage)) > 0)
-    cellularCentroid = handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:);
-    if(cellularCentroid(2) > 0)
-        trackedCell = thresholdedImage == thresholdedImage(cellularCentroid(2), cellularCentroid(1));
-    else
-        trackedCell = zeros(size(thresholdedImage));
-    end
+    
     trackedCellImage = trackedCellImage & ~trackedCell;
     blueMask = cat(3, ones(size(trackedCellImage)) -0.5 * trackedCellImage, ones(size(trackedCellImage)) + 0.6 * trackedCellImage, ones(size(trackedCellImage)) + 2 * trackedCellImage);
     subImage = imnormalize(subImage) .* blueMask;
@@ -319,13 +327,13 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             displacement = transformedPoint - handles.previousPosition;
             handles.imorigin = evaluateNewOrigin(handles, uint16([handles.imorigin(1) - displacement(1), handles.imorigin(2) - displacement(2)]));
             guidata(hObject, handles);
-            handles.previousPosition = transformedPoint;
         end
+        handles.previousPosition = transformedPoint;
     end
     imageCanvas_refreshImage(handles);
 else
     set(handles.figure1, 'Pointer', 'arrow');
-    handles.previousPosition = [-1,-1];
+    %handles.previousPosition = [-1,-1];
     handles.isInsideCanvas = 0;
 end
 guidata(hObject, handles);
@@ -456,6 +464,7 @@ selectedChannel = getCurrentPopupString(handles.channelSelection);
 selectedPosition = getCurrentPopupString(handles.stagePositionSelection);
 set(handles.channelToogleSelection, 'Value', get(handles.channelSelection, 'Value'));
 setappdata(handles.figure1, 'isEditing',  0);
+setappdata(handles.figure1, 'autoTracking', 0);
 
 [handles.imageFilenames, handles.imageTimepoints, handles.dataLength] = generateImageSequence(handles);
 handles.primaryChannel = selectedChannel;
@@ -467,9 +476,16 @@ handles.selectedPosition = selectedPosition;
 rawdataFolder = fullfile(handles.sourcePath, 'RAW_DATA');
 handles.rawdataFolder = rawdataFolder;
 
-%IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{1}));
 IM = imread(fullfile(handles.rawdataFolder, handles.imageFilenames{1}));
 handles.totalSize = size(IM);
+% SPEED UP ATTEMPT: PREALLOCATE IMAGES
+handles.imageSequence = uint8(zeros(size(IM,1), size(IM,2), length(handles.imageFilenames)));
+set(handles.progressBar, 'Value', 0);
+set(handles.progressBar, 'Maximum', length(handles.imageFilenames));
+for i=1:length(handles.imageFilenames)
+    handles.imageSequence(:,:,i) = im2uint8(imnormalize(imread(fullfile(handles.rawdataFolder, handles.imageFilenames{i}))));
+    set(handles.progressBar, 'Value', i);
+end
 
 maxPointsPerImage = 1000;
 handles.annotationLayers.pointLayer = repmat(struct('n', 0, 'point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'version', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
@@ -498,8 +514,9 @@ hold(handles.imageCanvas);
 % redMask = im2uint8(cat(3, ones(size(subImage))*0.3, ones(size(subImage))*1, ones(size(subImage))*0.3));
 % handles.selectionLayer = image(redMask);
 % set(handles.selectionLayer, 'AlphaData', zeros(size(subImage)));
-handles.axisH = plot(xlim, [uint16(size(subImage,2)/2), uint16(size(subImage,2)/2)]);
-handles.axisV = plot([uint16(size(subImage,1)/2), uint16(size(subImage,1)/2)], ylim);
+
+%handles.axisH = plot(xlim, [uint16(size(subImage,2)/2), uint16(size(subImage,2)/2)]);
+%handles.axisV = plot([uint16(size(subImage,1)/2), uint16(size(subImage,1)/2)], ylim);
 hold(handles.imageCanvas);
 
 handles.definedSize = getObjectPosition(handles.imageCanvas, [3,4]);
@@ -517,8 +534,8 @@ setappdata(handles.figure1, 'yloc', uint16(size(subImage,2)/2));
 guidata(hObject, handles);
 
 set(handles.implot, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
-set(handles.axisH, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
-set(handles.axisV, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
+%set(handles.axisH, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
+%set(handles.axisV, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
 
 set(gca, 'xlimmode','manual',...
     'ylimmode','manual',...
@@ -584,7 +601,7 @@ changeObjectPosition(handles.figure1, [3:4], totalFigureSize);
 
 function [imageFilenames, imageTimepoint, dataLength] = generateImageSequence(handles)
 selectedGroup = getCurrentPopupString(handles.imageGroupSelection);
-selectedChannel = getCurrentPopupString(handles.channelSelection);
+selectedChannel = getCurrentPopupString(handles.channelToogleSelection);
 selectedPosition = getCurrentPopupString(handles.stagePositionSelection);
 imageGroups = handles.database.group_label;
 channels = handles.database.channel_name;
@@ -679,8 +696,9 @@ end
 
 % --- Executes on selection change in channelToogleSelection.
 function channelToogleSelection_Callback(hObject, eventdata, handles)
-set(handles.channelSelection, 'Value', get(handles.channelToogleSelection, 'Value'));
+%set(handles.channelSelection, 'Value', get(handles.channelToogleSelection, 'Value'));
 handles.selectedChannel = getCurrentPopupString(handles.channelToogleSelection);
+guidata(hObject, handles);
 currentTimepoint = handles.imageTimepoints(getSliderIndex(handles));
 [handles.imageFilenames, handles.imageTimepoints, handles.dataLength] = generateImageSequence(handles);
 [~,newIndex] = min(abs(handles.imageTimepoints - currentTimepoint));
@@ -807,7 +825,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         % find an object in the selected position
         if(~selectedCell)
             IM = getappdata(handles.figure1, 'IM');
-            extend = 35;
+            extend = 50;
             subRectangle = [currentAbsolutePoint(1) - extend, currentAbsolutePoint(2) - extend, currentAbsolutePoint(1) + extend, currentAbsolutePoint(2) + extend];
             subRectangle(1) = max(subRectangle(1),1);
             subRectangle(2) = max(subRectangle(2),1);
@@ -815,9 +833,16 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             subRectangle(4) = min(subRectangle(4),handles.totalSize(1));
             subImage =IM(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3));
             oldObject = thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3));
-            BlurredImage =  imfilter(imnormalize(subImage), fspecial('gaussian', 15, 4), 'replicate');
-            newObject = im2bw(BlurredImage, graythresh(BlurredImage(~oldObject))) & ~imdilate(oldObject, strel('disk', 1));
+            BlurredImage =  imfilter(imnormalize(subImage), fspecial('gaussian', 10, 4), 'replicate');
+            newObject = im2bw(BlurredImage, graythresh(BlurredImage(~oldObject))) & ~imdilate(oldObject, strel('disk', 2));
+
+            % Only record the object for that overlap with the source
+            % point.
+            currentRelativePoint = currentAbsolutePoint - subRectangle(1:2);
+            newObject = imfill(bwperim(newObject), sub2ind(size(newObject), currentRelativePoint(2), currentRelativePoint(1)));
+            newObject = imdilate(imerode(newObject, strel('disk',2)), strel('disk',2));
             newObject = imfill(newObject, 'holes');
+            
             substituteImage = newObject * double(max(thresholdedImage(:)) + 1) + oldObject;
             thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3)) = substituteImage;
             setappdata(handles.figure1, 'segmentationEdited', 1);
@@ -830,14 +855,8 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     % current selected cell
     % TRACK PROPAGATION ALGORITHM
     if(get(handles.startStopTrackToogleButton, 'Value') && ~getappdata(handles.figure1, 'isEditing'))
-%         if(handles.previousCell(1) ~= -1)   % Sensitive to image scaling
-%             displacement = [0,0];
-%         else
-%             displacement = currentAbsolutePoint - handles.previousCell;
-%             displacement = [0,0];
-%         end
-%         handles.previousCell = currentAbsolutePoint;
-%         handles.imorigin = evaluateNewOrigin(handles, handles.imorigin + displacement);
+        setappdata(handles.figure1, 'autoTracking', 0);
+
 %         guidata(hObject, handles);
 %         imageCanvas_setImage(handles, getSliderIndex(handles) + 1);
         thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
@@ -846,7 +865,9 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             return;
         end
         foundCell = 1;
+        handles.previousCell = currentAbsolutePoint;
         while(foundCell)
+            setappdata(handles.figure1, 'autoTracking', 1);
             currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
             thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
             foundCell = 0;
@@ -869,7 +890,12 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:) = cellularCentroid;
                 %fprintf('Time: %d\tCell: %d\tValue: %d\tPoint: %d,%d\tReference: %d,%d\n', currentTime, handles.cell_id, thresholdedImage(cellularCentroid(2), cellularCentroid(1)), handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,1), handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,2),referencePoint(1),referencePoint(2));
                 referencePoint = cellularCentroid;
+                displacement = cellularCentroid - round(handles.previousCell);
+                handles.previousCell = cellularCentroid;
+                previousOrigin = handles.imorigin;
+                handles.imorigin = evaluateNewOrigin(handles, double(handles.imorigin) + displacement);
                 guidata(hObject, handles);
+                fprintf('Displacement: %d,%d\t%d,%d\t%d,%d\n', displacement(1), displacement(2), previousOrigin(1), previousOrigin(2), handles.imorigin(1), handles.imorigin(2));
                 imageCanvas_refreshImage(handles);
                 drawnow;
                 if(getSliderIndex(handles) > 1)
@@ -877,6 +903,8 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 end
             end
         end
+        guidata(hObject, handles);
+        setappdata(handles.figure1, 'autoTracking', 0);
     end
     imageCanvas_refreshImage(handles);
 end

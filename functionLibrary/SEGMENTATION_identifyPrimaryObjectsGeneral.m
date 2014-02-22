@@ -22,8 +22,8 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     BlurredImage = imfilter(OriginalImage_normalized, fspecial('gaussian', round(SizeOfSmoothingFilter), round(SizeOfSmoothingFilter/3.5)), 'replicate');
     
     edgeImage = imfill(edge(BlurredImage, 'canny'), 'holes');
-    threshold = quantile(BlurredImage(edgeImage), 0.1);
-    Objects = imfill(edgeImage + logical(OriginalImage_normalized > threshold), 'holes');
+    threshold = quantile(BlurredImage(edgeImage), 0.2);
+    Objects = imfill(edgeImage + logical(BlurredImage > threshold), 'holes');
     Objects = imopen(Objects, strel('disk',1));
     
     ObjectsLabeled = bwlabel(Objects);
