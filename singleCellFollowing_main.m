@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 20-Feb-2014 14:03:36
+% Last Modified by GUIDE v2.5 25-Feb-2014 18:52:02
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -55,8 +55,8 @@ function singleCellFollowing_main_OpeningFcn(hObject, eventdata, handles, vararg
 % Choose default command line output for singleCellFollowing_main
 handles.output = hObject;
 
-handles.maxWidth = 400;
-handles.maxHeight = 400;
+handles.maxWidth = 350;
+handles.maxHeight = 350;
 handles.minWidth = 50;
 handles.minHeight = 50;
 handles.marginLevel1 = 10;
@@ -728,7 +728,7 @@ function startStopTrackToogleButton_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of startStopTrackToogleButton
 handles.isTracking = ~handles.isTracking;
 if(get(handles.startStopTrackToogleButton, 'Value'))
-    handles.cell_id = handles.cell_id + 1;
+    setappdata(handles.figure1, 'trackingStartPoint', 1);
 else
     handles.previousCell = [-1,-1];
 end
@@ -834,19 +834,20 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             subImage =IM(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3));
             oldObject = thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3));
             BlurredImage =  imfilter(imnormalize(subImage), fspecial('gaussian', 10, 4), 'replicate');
-            newObject = im2bw(BlurredImage, graythresh(BlurredImage(~oldObject))) & ~imdilate(oldObject, strel('disk', 2));
+            newObject = im2bw(BlurredImage, graythresh(BlurredImage(~oldObject))) & ~bwperim(oldObject);
 
             % Only record the object for that overlap with the source
             % point.
             currentRelativePoint = currentAbsolutePoint - subRectangle(1:2);
-            newObject = imfill(bwperim(newObject), sub2ind(size(newObject), currentRelativePoint(2), currentRelativePoint(1)));
-            newObject = imdilate(imerode(newObject, strel('disk',2)), strel('disk',2));
-            newObject = imfill(newObject, 'holes');
-            
-            substituteImage = newObject * double(max(thresholdedImage(:)) + 1) + oldObject;
-            thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3)) = substituteImage;
-            setappdata(handles.figure1, 'segmentationEdited', 1);
-            setappdata(handles.figure1, 'thresholdedImage', thresholdedImage);
+            if(newObject(currentRelativePoint(2), currentRelativePoint(1)))
+                newObject = imfill(bwperim(newObject), sub2ind(size(newObject), currentRelativePoint(2), currentRelativePoint(1)));
+                newObject = imdilate(imerode(newObject, strel('disk',3)), strel('disk',2));
+                newObject = imfill(newObject, 'holes');
+                substituteImage = newObject * double(max(thresholdedImage(:)) + 1) + oldObject;
+                thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3)) = substituteImage;
+                setappdata(handles.figure1, 'segmentationEdited', 1);
+                setappdata(handles.figure1, 'thresholdedImage', thresholdedImage);
+            end
         end
         setappdata(handles.figure1, 'selectedCell', selectedCell);
         setappdata(handles.figure1, 'sourcePoint', currentAbsolutePoint);
@@ -856,17 +857,24 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     % TRACK PROPAGATION ALGORITHM
     if(get(handles.startStopTrackToogleButton, 'Value') && ~getappdata(handles.figure1, 'isEditing'))
         setappdata(handles.figure1, 'autoTracking', 0);
-
-%         guidata(hObject, handles);
-%         imageCanvas_setImage(handles, getSliderIndex(handles) + 1);
         thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
         referencePoint = currentAbsolutePoint;
         if(~thresholdedImage(currentAbsolutePoint(2),currentAbsolutePoint(1)))
             return;
         end
+        
+        % Look for existing cell track, usefull for editing tracks,
+        % only check once, when the user has clicked the startStop button
+        if(getappdata(handles.figure1, 'trackingStartPoint'))
+            handles.cell_id = defineCellId(handles, currentAbsolutePoint);
+            guidata(hObject, handles);
+            setappdata(handles.figure1, 'trackingStartPoint', 0);
+        end
+        
         foundCell = 1;
         handles.previousCell = currentAbsolutePoint;
-        while(foundCell)
+        setappdata(handles.figure1, 'interruptTracking', 0);
+        while(foundCell && ~getappdata(handles.figure1, 'interruptTracking'));
             setappdata(handles.figure1, 'autoTracking', 1);
             currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
             thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
@@ -877,15 +885,15 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             %fprintf('Closest two points: %.2f, %.2f\n', sortedDistance(1), sortedDistance(2));
             if(sortedDistance(1) < 20 && sortedDistance(2) > 10)
                 cellularCentroid = round(centroids(sortedIndex(1)).Centroid);
-                % Check if the new centroid is equal to the one that has
-                % already been found (useful when connecting tracks)
-                if(sum(cellularCentroid == handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:)) == 2)
-                    foundCell = 0;
-                else
-                    foundCell = 1;
-                end
+                foundCell = 1;
             end
             if(foundCell)
+                % Check if the new centroid is equal to the one that has
+                % already been found (useful when connecting tracks)
+                centroidComparison = repmat(cellularCentroid, size(handles.annotationLayers.pointLayer(currentTime).point,1),1);
+                if(sum(sum(centroidComparison == handles.annotationLayers.pointLayer(currentTime).point))==2)
+                    foundCell = 0;
+                end
                 handles.annotationLayers.pointLayer(currentTime).n = handles.annotationLayers.pointLayer(currentTime).n+1;
                 handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:) = cellularCentroid;
                 %fprintf('Time: %d\tCell: %d\tValue: %d\tPoint: %d,%d\tReference: %d,%d\n', currentTime, handles.cell_id, thresholdedImage(cellularCentroid(2), cellularCentroid(1)), handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,1), handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,2),referencePoint(1),referencePoint(2));
@@ -906,7 +914,31 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         guidata(hObject, handles);
         setappdata(handles.figure1, 'autoTracking', 0);
     end
+    if(~get(handles.startStopTrackToogleButton, 'Value'))
+        handles.cell_id = defineCellId(handles, currentAbsolutePoint);
+        guidata(hObject, handles);
+    end
     imageCanvas_refreshImage(handles);
+end
+
+function cell_id = defineCellId(handles, currentAbsolutePoint)
+thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
+if(~thresholdedImage(currentAbsolutePoint(2),currentAbsolutePoint(1)))
+    cellValue = 0;
+else
+    cellValue = thresholdedImage(currentAbsolutePoint(2),currentAbsolutePoint(1));
+end
+currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
+trackedCentroids = handles.annotationLayers.pointLayer(currentTime).point;
+trackedCentroidsId = find(trackedCentroids(:,1) > 0);
+trackedCentroids = trackedCentroids(trackedCentroidsId,:);
+trackedCentroidsIndex = sub2ind(size(thresholdedImage), trackedCentroids(:,2), trackedCentroids(:,1));
+trackedCentroidsValues = thresholdedImage(trackedCentroidsIndex);
+existingCell = find(trackedCentroidsValues == cellValue);
+if(~isempty(existingCell))
+    cell_id = trackedCentroidsId(existingCell(1));
+else
+    cell_id = max(trackedCentroidsId) + 1;
 end
 
 % --- Executes on mouse press over figure background, over a disabled or
@@ -1040,3 +1072,26 @@ selectedPosition = handles.selectedPosition;
 databaseFile = handles.databaseFile;
 sourcePath = handles.sourcePath;
 uisave({'singleCellTracks','selectedGroup','selectedPosition','databaseFile','sourcePath'},fullfile(sourcePath, 'tracking.mat'));
+
+
+% --- Executes on button press in centerButton.
+function centerButton_Callback(hObject, eventdata, handles)
+% hObject    handle to centerButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+currentFrame = str2double(get(handles.currentFrameText, 'String'));
+currentTime = handles.imageTimepoints(currentFrame);
+if(handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id) > 0)
+    newOrigin(1) = handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,1)-round(handles.canvasSize(1)/2);
+    newOrigin(2) = handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,2)-round(handles.canvasSize(2)/2);
+    handles.imorigin = evaluateNewOrigin(handles, newOrigin);
+end
+guidata(hObject, handles);
+imageCanvas_refreshImage(handles);
+
+% --- Executes on button press in pauseTrackButton.
+function pauseTrackButton_Callback(hObject, eventdata, handles)
+% hObject    handle to pauseTrackButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+setappdata(handles.figure1, 'interruptTracking', 1);
