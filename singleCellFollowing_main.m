@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 25-Feb-2014 18:52:02
+% Last Modified by GUIDE v2.5 26-Feb-2014 13:06:05
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -217,58 +217,50 @@ thresholdedImage = thresholdedImage(subsettingRectangle{1}, subsettingRectangle{
 trackedCellImage = trackedCellImage(subsettingRectangle{1}, subsettingRectangle{2});
 trackedCell = trackedCell(subsettingRectangle{1}, subsettingRectangle{2});
 
-% DISPLAY OPTION 0
-% highglightedImage = bwperim(thresholdedImage);
-% if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-%     highglightedImage = highglightedImage | thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1));
-% end
-% subImage = imoverlay(imnormalize(subImage), highglightedImage, [0.3, 1, 0.3]);
-% if(selectedCell > 0)
-%     subImage = imoverlay(subImage, thresholdedImage == selectedCell, [1, 0.2, 0.3]);
-% end
-% if(handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,1))
-%     cellularCentroid = handles.annotationLayers.pointLayer(currentTime).point(handles.cell_id,:);
-%     trackedCell = thresholdedImage(cellularCentroid(2), cellularCentroid(1));
-%     trackedCellImage = thresholdedImage == trackedCell;
-%     subImage = imoverlay(subImage, trackedCellImage, [0.2, 0.8, 1]);
-% end
-
-% DISPLAY OPTION 1
-subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
-if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-    highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell & thresholdedImage ~= trackedCellImage;
-    greenMask = cat(3, ones(size(highlightedCell)) + highlightedCell * -0.5, ones(size(highlightedCell)) + highlightedCell * 1.3, ones(size(highlightedCell)) + highlightedCell * -0.5);
-    subImage = im2uint8(imnormalize(subImage) .* greenMask);
-end
-if(selectedCell > 0)
-    selectedCellImage = thresholdedImage == selectedCell & thresholdedImage ~= trackedCellImage;
-    redMask = cat(3, ones(size(selectedCellImage)) + 1 * selectedCellImage, ones(size(selectedCellImage)) - 0.5 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
-    subImage = imnormalize(subImage) .* redMask;
-    subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
-end
-if(sum(sum(trackedCellImage)) > 0)
-    
-    trackedCellImage = trackedCellImage & ~trackedCell;
-    blueMask = cat(3, ones(size(trackedCellImage)) -0.5 * trackedCellImage, ones(size(trackedCellImage)) + 0.6 * trackedCellImage, ones(size(trackedCellImage)) + 2 * trackedCellImage);
-    subImage = imnormalize(subImage) .* blueMask;
-    subImage = imoverlay(subImage, bwperim(trackedCellImage), [0.2, 0.8, 1]);
-    if(cellularCentroid(2) > 0)
-        orangeMask = cat(3, ones(size(trackedCell)) + 2 * trackedCell, ones(size(trackedCell)) + 1.5 * trackedCell, ones(size(trackedCell)) -0.5 * trackedCell);
-        subImage = imnormalize(subImage) .* orangeMask;
-        subImage = imoverlay(subImage, bwperim(trackedCell), [0.9, 0.5, 0.2]);
+if(~get(handles.quickndirtyMode, 'Value'))
+    % DISPLAY OPTION 0
+    highglightedImage = bwperim(thresholdedImage);
+    if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
+        highglightedImage = highglightedImage | thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1));
+    end
+    subImage = imoverlay(imnormalize(subImage), highglightedImage, [0.3, 1, 0.3]);
+    if(selectedCell > 0)
+        subImage = imoverlay(subImage, thresholdedImage == selectedCell, [1, 0.2, 0.3]);
+    end
+    if(sum(sum(trackedCellImage)) > 0)
+        trackedCellImage = trackedCellImage & ~trackedCell;
+        subImage = imoverlay(subImage, trackedCellImage, [0.2, 0.8, 1]);
+        if(cellularCentroid(2) > 0)
+            subImage = imoverlay(subImage, trackedCell, [0.9, 0.5, 0.2]);
+        end
+    end
+else
+    % DISPLAY OPTION 1
+    subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
+    if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
+        highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell & thresholdedImage ~= trackedCellImage;
+        greenMask = cat(3, ones(size(highlightedCell)) + highlightedCell * -0.5, ones(size(highlightedCell)) + highlightedCell * 1.3, ones(size(highlightedCell)) + highlightedCell * -0.5);
+        subImage = im2uint8(imnormalize(subImage) .* greenMask);
+    end
+    if(selectedCell > 0)
+        selectedCellImage = thresholdedImage == selectedCell & thresholdedImage ~= trackedCellImage;
+        redMask = cat(3, ones(size(selectedCellImage)) + 1 * selectedCellImage, ones(size(selectedCellImage)) - 0.5 * selectedCellImage, ones(size(selectedCellImage)) - 0.7 * selectedCellImage);
+        subImage = imnormalize(subImage) .* redMask;
+        subImage = imoverlay(subImage, bwperim(selectedCellImage), [1, 0.2, 0.3]);
+    end
+    if(sum(sum(trackedCellImage)) > 0)
+        
+        trackedCellImage = trackedCellImage & ~trackedCell;
+        blueMask = cat(3, ones(size(trackedCellImage)) -0.5 * trackedCellImage, ones(size(trackedCellImage)) + 0.6 * trackedCellImage, ones(size(trackedCellImage)) + 2 * trackedCellImage);
+        subImage = imnormalize(subImage) .* blueMask;
+        subImage = imoverlay(subImage, bwperim(trackedCellImage), [0.2, 0.8, 1]);
+        if(cellularCentroid(2) > 0)
+            orangeMask = cat(3, ones(size(trackedCell)) + 2 * trackedCell, ones(size(trackedCell)) + 1.5 * trackedCell, ones(size(trackedCell)) -0.5 * trackedCell);
+            subImage = imnormalize(subImage) .* orangeMask;
+            subImage = imoverlay(subImage, bwperim(trackedCell), [0.9, 0.5, 0.2]);
+        end
     end
 end
-
-% DISPLAY OPTION 2
-% highlightedImage = bwperim(thresholdedImage);
-% if(thresholdedImage(transformedPoint(2), transformedPoint(1)))
-%     highlightedCell = thresholdedImage == thresholdedImage(transformedPoint(2),transformedPoint(1)) & thresholdedImage ~= selectedCell;
-%     highlightedImage(highlightedCell) = 1;
-% end
-% selectedImage = zeros(size(subImage));
-% if(selectedCell > 0)
-%     selectedImage = thresholdedImage == selectedCell;
-% end
 
 % --- Executes during object creation, after setting all properties.
 function movieSlider_CreateFcn(hObject, eventdata, handles)
@@ -874,6 +866,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         foundCell = 1;
         handles.previousCell = currentAbsolutePoint;
         setappdata(handles.figure1, 'interruptTracking', 0);
+        set(handles.startStopTrackToogleButton, 'Enable', 'off');
         while(foundCell && ~getappdata(handles.figure1, 'interruptTracking'));
             setappdata(handles.figure1, 'autoTracking', 1);
             currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
@@ -891,7 +884,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 % Check if the new centroid is equal to the one that has
                 % already been found (useful when connecting tracks)
                 centroidComparison = repmat(cellularCentroid, size(handles.annotationLayers.pointLayer(currentTime).point,1),1);
-                if(sum(sum(centroidComparison == handles.annotationLayers.pointLayer(currentTime).point))==2)
+                if(sum(sum(centroidComparison == handles.annotationLayers.pointLayer(currentTime).point))==2 && ~get(handles.propagateMode, 'Value'))
                     foundCell = 0;
                 end
                 handles.annotationLayers.pointLayer(currentTime).n = handles.annotationLayers.pointLayer(currentTime).n+1;
@@ -903,7 +896,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 previousOrigin = handles.imorigin;
                 handles.imorigin = evaluateNewOrigin(handles, double(handles.imorigin) + displacement);
                 guidata(hObject, handles);
-                fprintf('Displacement: %d,%d\t%d,%d\t%d,%d\n', displacement(1), displacement(2), previousOrigin(1), previousOrigin(2), handles.imorigin(1), handles.imorigin(2));
+                %fprintf('Displacement: %d,%d\t%d,%d\t%d,%d\n', displacement(1), displacement(2), previousOrigin(1), previousOrigin(2), handles.imorigin(1), handles.imorigin(2));
                 imageCanvas_refreshImage(handles);
                 drawnow;
                 if(getSliderIndex(handles) > 1)
@@ -911,6 +904,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 end
             end
         end
+        set(handles.startStopTrackToogleButton, 'Enable', 'on');
         guidata(hObject, handles);
         setappdata(handles.figure1, 'autoTracking', 0);
     end
@@ -937,8 +931,10 @@ trackedCentroidsValues = thresholdedImage(trackedCentroidsIndex);
 existingCell = find(trackedCentroidsValues == cellValue);
 if(~isempty(existingCell))
     cell_id = trackedCentroidsId(existingCell(1));
-else
+elseif(~isempty(trackedCentroidsId))
     cell_id = max(trackedCentroidsId) + 1;
+else
+    cell_id = 1;
 end
 
 % --- Executes on mouse press over figure background, over a disabled or
@@ -1095,3 +1091,38 @@ function pauseTrackButton_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 setappdata(handles.figure1, 'interruptTracking', 1);
+
+
+% --- Executes on button press in loadAnnotationButton.
+function loadAnnotationButton_Callback(hObject, eventdata, handles)
+% hObject    handle to loadAnnotationButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+[databaseFile, sourcePath] = uigetfile(fullfile(handles.sourcePath, '*.mat'));
+load(fullfile(sourcePath, databaseFile));
+handles.annotationLayers = singleCellTracks;
+handles.cell_id = 1;
+guidata(hObject, handles);
+imageCanvas_refreshImage(handles);
+
+% --- Executes on button press in quickndirtyMode.
+function quickndirtyMode_Callback(hObject, eventdata, handles)
+% hObject    handle to quickndirtyMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of quickndirtyMode
+if(get(handles.quickndirtyMode, 'Value'))
+    set(handles.quickndirtyMode, 'String', 'Fancy cells');
+else
+    set(handles.quickndirtyMode, 'String', 'Quick n dirty');
+end
+imageCanvas_refreshImage(handles);
+
+% --- Executes on button press in propagateMode.
+function propagateMode_Callback(hObject, eventdata, handles)
+% hObject    handle to propagateMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of propagateMode

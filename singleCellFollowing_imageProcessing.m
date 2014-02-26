@@ -2,7 +2,7 @@ function [finalSegmentation, localMaxima] = singleCellFollowing_imageProcessing(
 IM = double(imnormalize(IM));
 BlurredImage = imfilter(IM, fspecial('gaussian', 10, 4), 'replicate');
 edgeImage = imfill(edge(BlurredImage, 'canny'), 'holes');
-threshold = quantile(BlurredImage(edgeImage), 0.2);
+threshold = quantile(BlurredImage(edgeImage), 0.3);
 thresholdedImage = imfill(edgeImage + logical(BlurredImage > threshold), 'holes');
 thresholdedImage = imopen(thresholdedImage, strel('disk',1));
 
