@@ -52,7 +52,7 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     % IDENTIFY LOCAL MAXIMA IN THE INTENSITY OF DISTANCE TRANSFORMED IMAGE    
     if strcmp(p.Results.LocalMaximaType, 'Intensity')
         if(~isempty(p.Results.SecondaryImage))
-            BlurredImage = imnormalize(OriginalImage) + imnormalize(p.Results.SecondaryImage);
+            %BlurredImage = imnormalize(OriginalImage) + imnormalize(p.Results.SecondaryImage);
             BlurredImage = imfilter(BlurredImage, fspecial('gaussian', round(SizeOfSmoothingFilter), round(SizeOfSmoothingFilter/3.5)));
         end
         ResizedBlurredImage = imresize(BlurredImage,ImageResizeFactor,'bilinear');

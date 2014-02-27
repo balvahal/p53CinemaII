@@ -2,7 +2,7 @@ function [finalSegmentation, localMaxima] = singleCellFollowing_imageProcessing(
 IM = double(imnormalize(IM));
 BlurredImage = imfilter(IM, fspecial('gaussian', 10, 4), 'replicate');
 edgeImage = imfill(edge(BlurredImage, 'canny'), 'holes');
-threshold = quantile(BlurredImage(edgeImage), 0.3);
+threshold = quantile(BlurredImage(edgeImage), 0.2);
 thresholdedImage = imfill(edgeImage + logical(BlurredImage > threshold), 'holes');
 thresholdedImage = imopen(thresholdedImage, strel('disk',1));
 
@@ -16,7 +16,7 @@ if(sum(sum(thresholdedImage))>0)
     BlurredImage(~thresholdedImage) = 0;
     
     secondPassSegmentation = SEGMENTATION_identifyPrimaryObjectsGeneral(IM, ...
-        'LocalMaximaType', 'Shape', 'WatershedTransformImageType', 'Distance', ...
+        'LocalMaximaType', 'Intensity', 'WatershedTransformImageType', 'Distance', ...
         'MaximaSuppressionSize', 3, 'ImageResizeFactor', 0.75);
     
     % localMaxima = imregionalmax(BlurredImage);

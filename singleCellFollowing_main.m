@@ -55,8 +55,8 @@ function singleCellFollowing_main_OpeningFcn(hObject, eventdata, handles, vararg
 % Choose default command line output for singleCellFollowing_main
 handles.output = hObject;
 
-handles.maxWidth = 350;
-handles.maxHeight = 350;
+handles.maxWidth = 300;
+handles.maxHeight = 300;
 handles.minWidth = 50;
 handles.minHeight = 50;
 handles.marginLevel1 = 10;
@@ -409,7 +409,7 @@ selectedGroup = getCurrentPopupString(handles.imageGroupSelection);
 % Get unique positions for this particular group and populate
 positionLabels = handles.database.position_number;
 positions = positionLabels(strcmp(groupLabels, selectedGroup));
-set(handles.stagePositionSelection, 'String', unique(positions));
+set(handles.stagePositionSelection, 'String', num2str(unique(positions)));
 selectedStagePosition = getCurrentPopupString(handles.stagePositionSelection);
 % Get unique channels for imagegroup and stageposition and populate channel
 channelLabels = handles.database.channel_name;
@@ -817,7 +817,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         % find an object in the selected position
         if(~selectedCell)
             IM = getappdata(handles.figure1, 'IM');
-            extend = 50;
+            extend = 20;
             subRectangle = [currentAbsolutePoint(1) - extend, currentAbsolutePoint(2) - extend, currentAbsolutePoint(1) + extend, currentAbsolutePoint(2) + extend];
             subRectangle(1) = max(subRectangle(1),1);
             subRectangle(2) = max(subRectangle(2),1);
@@ -833,8 +833,8 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
             currentRelativePoint = currentAbsolutePoint - subRectangle(1:2);
             if(newObject(currentRelativePoint(2), currentRelativePoint(1)))
                 newObject = imfill(bwperim(newObject), sub2ind(size(newObject), currentRelativePoint(2), currentRelativePoint(1)));
-                newObject = imdilate(imerode(newObject, strel('disk',3)), strel('disk',2));
-                newObject = imfill(newObject, 'holes');
+                newObject = imdilate(imerode(newObject, strel('disk',2)), strel('disk',1)) & ~oldObject;
+                %newObject = imfill(newObject, 'holes');
                 substituteImage = newObject * double(max(thresholdedImage(:)) + 1) + oldObject;
                 thresholdedImage(subRectangle(2):subRectangle(4), subRectangle(1):subRectangle(3)) = substituteImage;
                 setappdata(handles.figure1, 'segmentationEdited', 1);
@@ -936,6 +936,7 @@ elseif(~isempty(trackedCentroidsId))
 else
     cell_id = 1;
 end
+%fprintf('Number of single tracks: %d\t Current Cell: %d\n', length(trackedCentroidsValues), cell_id);
 
 % --- Executes on mouse press over figure background, over a disabled or
 % --- inactive control, or over an axes background.
@@ -961,7 +962,8 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         selectedPoint1 = getappdata(handles.figure1, 'selectedCell');
         % If the mouse was pressed and released in recognized object
         % positions
-        if(selectedPoint1 > 0 && selectedPoint2 > 0)
+        %if(selectedPoint1 > 0 && selectedPoint2 > 0)
+        if(selectedPoint1 > 0)
             isolatedObjects = Objects == selectedPoint1 | Objects == selectedPoint2;
             [j,i] = ind2sub(size(Objects), find(isolatedObjects));
             isolatedObjectsModified = isolatedObjects(min(j):max(j),min(i):max(i));
