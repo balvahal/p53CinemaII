@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 26-Feb-2014 13:06:05
+% Last Modified by GUIDE v2.5 02-Mar-2014 14:22:22
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -55,8 +55,8 @@ function singleCellFollowing_main_OpeningFcn(hObject, eventdata, handles, vararg
 % Choose default command line output for singleCellFollowing_main
 handles.output = hObject;
 
-handles.maxWidth = 300;
-handles.maxHeight = 300;
+handles.maxWidth = 600;
+handles.maxHeight = 500;
 handles.minWidth = 50;
 handles.minHeight = 50;
 handles.marginLevel1 = 10;
@@ -210,12 +210,22 @@ if(cellularCentroid(2) > 0)
 else
     trackedCell = zeros(size(thresholdedImage));
 end
+% if(sum(handles.annotationLayers.divisionLayer(currentTime).point(:,1)) > 0)
+%     validPoints = handles.annotationLayers.divisionLayer(currentTime).point(:,1) > 0;
+%     divisionIndex = sub2ind(size(IM), handles.annotationLayers.divisionLayer(currentTime).point(validPoints,2), handles.annotationLayers.divisionLayer(currentTime).point(validPoints,1));
+%     divisionImage = imfill(bwperim(thresholdedImage), divisionIndex);
+%     divisionImage = imdilate(divisionImage & ~bwperim(thresholdedImage), strel('disk',1));
+% else
+%     divisionImage = zeros(size(IM));
+% end
 
 subsettingRectangle = {handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1)};
 subImage = IM(subsettingRectangle{1}, subsettingRectangle{2});
 thresholdedImage = thresholdedImage(subsettingRectangle{1}, subsettingRectangle{2});
 trackedCellImage = trackedCellImage(subsettingRectangle{1}, subsettingRectangle{2});
 trackedCell = trackedCell(subsettingRectangle{1}, subsettingRectangle{2});
+
+% divisionImage = divisionImage(subsettingRectangle{1},subsettingRectangle{2});
 
 if(~get(handles.quickndirtyMode, 'Value'))
     % DISPLAY OPTION 0
@@ -234,6 +244,9 @@ if(~get(handles.quickndirtyMode, 'Value'))
             subImage = imoverlay(subImage, trackedCell, [0.9, 0.5, 0.2]);
         end
     end
+%     if(sum(sum(divisionImage)) > 0)
+%         subImage = imoverlay(subImage, divisionImage, [0.9, 0.1, 0.9]);
+%     end
 else
     % DISPLAY OPTION 1
     subImage = imoverlay(im2rgb(subImage), bwperim(thresholdedImage), [0.3, 1, 0.3]);
@@ -481,6 +494,7 @@ end
 
 maxPointsPerImage = 1000;
 handles.annotationLayers.pointLayer = repmat(struct('n', 0, 'point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'version', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
+handles.annotationLayers.divisionLayer = repmat(struct('point', zeros(maxPointsPerImage,2),'cell_id', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
 handles.annotationLayers.trackLayer = repmat(struct('point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'cell', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
 
 currentAxesUnits = get(handles.imageCanvas, 'Units');
@@ -552,11 +566,12 @@ handles.segmentationFolder = segmentationFolder;
 for i=1:1:length(handles.imageFilenames)
     segmentationFile = regexprep(handles.imageFilenames{i}, '_w(\d+)\w+.*_s', '_s');
     segmentationFile = regexprep(segmentationFile, '\.\w+', '\.PNG', 'ignoreCase');
-    if(~exist(fullfile(segmentationFolder, segmentationFile), 'file') || get(handles.preprocessCheckbox, 'Value'))
+    if(~exist(fullfile(handles.segmentationFolder, segmentationFile), 'file') || get(handles.preprocessCheckbox, 'Value'))
         %IM = imread(fullfile(handles.sourcePath, handles.selectedGroup, handles.imageFilenames{i}));
-        IM = imread(fullfile(handles.rawdataFolder, handles.imageFilenames{i}));
+        %IM = imread(fullfile(handles.rawdataFolder, handles.imageFilenames{i}));
+        IM = handles.imageSequence(:,:,i);
         segmentedImage = singleCellFollowing_imageProcessing(IM);
-        imwrite(uint16(segmentedImage), fullfile(segmentationFolder, segmentationFile));
+        imwrite(uint16(segmentedImage), fullfile(handles.segmentationFolder, segmentationFile));
     end
     set(handles.progressBar, 'Value', i);
     drawnow;
@@ -762,6 +777,14 @@ if(strcmp(eventdata.Key,'control'))
         set(handles.figure1, 'Pointer', 'arrow');
     end
 end
+if(strcmp(eventdata.Key,'backspace'))
+    currentFrame = str2double(get(handles.currentFrameText, 'String'));
+    currentTimepoint = handles.imageTimepoints(currentFrame);
+    for i=1:currentTimepoint
+        handles.annotationLayers.pointLayer(i).point(handles.cell_id,:) = [0,0];
+    end
+end
+imageCanvas_refreshImage(handles);
 guidata(hObject, handles);
 
 
@@ -817,7 +840,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         % find an object in the selected position
         if(~selectedCell)
             IM = getappdata(handles.figure1, 'IM');
-            extend = 20;
+            extend = 25;
             subRectangle = [currentAbsolutePoint(1) - extend, currentAbsolutePoint(2) - extend, currentAbsolutePoint(1) + extend, currentAbsolutePoint(2) + extend];
             subRectangle(1) = max(subRectangle(1),1);
             subRectangle(2) = max(subRectangle(2),1);
@@ -847,7 +870,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     % If the user is tracking and not editing, propagate tracking from
     % current selected cell
     % TRACK PROPAGATION ALGORITHM
-    if(get(handles.startStopTrackToogleButton, 'Value') && ~getappdata(handles.figure1, 'isEditing'))
+    if(get(handles.startStopTrackToogleButton, 'Value') && ~getappdata(handles.figure1, 'isEditing') && ~get(handles.divisionToogleButton, 'Value'))
         setappdata(handles.figure1, 'autoTracking', 0);
         thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
         referencePoint = currentAbsolutePoint;
@@ -908,6 +931,24 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
         guidata(hObject, handles);
         setappdata(handles.figure1, 'autoTracking', 0);
     end
+    if(get(handles.divisionToogleButton, 'Value'))
+        currentTime = handles.imageTimepoints(str2double(get(handles.currentFrameText, 'String')));
+        thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
+        referencePoint = currentAbsolutePoint;
+        if(~thresholdedImage(currentAbsolutePoint(2),currentAbsolutePoint(1)))
+            return;
+        else
+            insertIndex = min(find(handles.annotationLayers.divisionLayer(currentTime).point(:,1) == 0));
+            [selectedCell, foundTrackedCell] = defineCellId(handles, currentAbsolutePoint);
+            if(~foundTrackedCell)
+                selectedCell = 0;
+            end
+            handles.annotationLayers.divisionLayer(currentTime).point(insertIndex,:) = currentAbsolutePoint;
+            handles.annotationLayers.divisionLayer(currentTime).cell_id(insertIndex) = selectedCell;
+            fprintf('Recorded division: index %d\ttime %d\tcell %d\n', insertIndex, currentTime, selectedCell);
+        end
+        guidata(hObject, handles);
+    end
     if(~get(handles.startStopTrackToogleButton, 'Value'))
         handles.cell_id = defineCellId(handles, currentAbsolutePoint);
         guidata(hObject, handles);
@@ -915,7 +956,7 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
     imageCanvas_refreshImage(handles);
 end
 
-function cell_id = defineCellId(handles, currentAbsolutePoint)
+function [cell_id, foundTrackedCell] = defineCellId(handles, currentAbsolutePoint)
 thresholdedImage = getappdata(handles.figure1, 'thresholdedImage');
 if(~thresholdedImage(currentAbsolutePoint(2),currentAbsolutePoint(1)))
     cellValue = 0;
@@ -931,12 +972,15 @@ trackedCentroidsValues = thresholdedImage(trackedCentroidsIndex);
 existingCell = find(trackedCentroidsValues == cellValue);
 if(~isempty(existingCell))
     cell_id = trackedCentroidsId(existingCell(1));
+    foundTrackedCell = 1;
 elseif(~isempty(trackedCentroidsId))
     cell_id = max(trackedCentroidsId) + 1;
+    foundTrackedCell = 0;
 else
     cell_id = 1;
+    foundTrackedCell = 0;
 end
-%fprintf('Number of single tracks: %d\t Current Cell: %d\n', length(trackedCentroidsValues), cell_id);
+fprintf('Number of single tracks: %d\t Current Cell: %d\n', length(trackedCentroidsValues), cell_id);
 
 % --- Executes on mouse press over figure background, over a disabled or
 % --- inactive control, or over an axes background.
@@ -1104,6 +1148,10 @@ function loadAnnotationButton_Callback(hObject, eventdata, handles)
 load(fullfile(sourcePath, databaseFile));
 handles.annotationLayers = singleCellTracks;
 handles.cell_id = 1;
+if(~isfield(handles.annotationLayers, 'divisionLayer'))
+    maxPointsPerImage = 10000;
+    handles.annotationLayers.divisionLayer = repmat(struct('point', zeros(maxPointsPerImage,2),'cell_id', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
+end
 guidata(hObject, handles);
 imageCanvas_refreshImage(handles);
 
@@ -1128,3 +1176,12 @@ function propagateMode_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of propagateMode
+
+
+% --- Executes on button press in divisionToogleButton.
+function divisionToogleButton_Callback(hObject, eventdata, handles)
+% hObject    handle to divisionToogleButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of divisionToogleButton

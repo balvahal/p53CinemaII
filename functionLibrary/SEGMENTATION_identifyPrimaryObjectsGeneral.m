@@ -15,7 +15,8 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     
     MinDiameter = p.Results.MinDiameter;
     ImageResizeFactor = p.Results.ImageResizeFactor;
-    MaximaSuppressionSize = p.Results.MaximaSuppressionSize; 
+    MaximaSuppressionSize = p.Results.MaximaSuppressionSize;
+    MaximaMask = getnhood(strel('disk', MaximaSuppressionSize));
     
     OriginalImage_normalized = imnormalize(double(OriginalImage));
     SizeOfSmoothingFilter=MinDiameter;
@@ -29,11 +30,13 @@ function [ObjectsLabeled, MaximaImage] = SEGMENTATION_identifyPrimaryObjectsGene
     ObjectsLabeled = bwlabel(Objects);
     props = regionprops(ObjectsLabeled, 'Solidity');
     primarySegmentation = ismember(ObjectsLabeled, find([props.Solidity] >= 0.95));
-
-    props = bwconncomp(primarySegmentation);
-    SizeOfSmoothingFilter = round(2 * sqrt(median(cellfun(@length, props.PixelIdxList))) / pi);
-    MaximaSuppressionSize = round(0.5 * SizeOfSmoothingFilter);
-    MaximaMask = getnhood(strel('disk', MaximaSuppressionSize));
+    
+    if(sum(sum(primarySegmentation)) > 0)
+        props = bwconncomp(primarySegmentation);
+        SizeOfSmoothingFilter = round(2 * sqrt(median(cellfun(@length, props.PixelIdxList))) / pi);
+        MaximaSuppressionSize = round(0.5 * SizeOfSmoothingFilter);
+        MaximaMask = getnhood(strel('disk', MaximaSuppressionSize));
+    end
     
     Objects = Objects & ~primarySegmentation;
     BlurredImage(~Objects) = 0;
