@@ -9,7 +9,7 @@ edgeImage = imfill(edgeImage, 'holes');
 threshold = quantile(BlurredImage(edgeImage), 0.4);
 thresholdedImage = imfill(edgeImage + logical(BlurredImage > threshold), 'holes');
 
-thresholdedImage = im2bw(BlurredImage, graythresh(BlurredImage)*0.5);
+%thresholdedImage = im2bw(BlurredImage, graythresh(BlurredImage)*0.5);
 thresholdedImage = imopen(thresholdedImage, strel('disk',1));
 
 thresholdedImage = bwlabel(thresholdedImage);

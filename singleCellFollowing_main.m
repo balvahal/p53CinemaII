@@ -22,7 +22,7 @@ function varargout = singleCellFollowing_main(varargin)
 
 % Edit the above text to modify the response to help singleCellFollowing_main
 
-% Last Modified by GUIDE v2.5 02-Mar-2014 14:22:22
+% Last Modified by GUIDE v2.5 06-Mar-2014 11:57:20
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -218,7 +218,6 @@ end
 % else
 %     divisionImage = zeros(size(IM));
 % end
-
 subsettingRectangle = {handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1)};
 subImage = IM(subsettingRectangle{1}, subsettingRectangle{2});
 thresholdedImage = thresholdedImage(subsettingRectangle{1}, subsettingRectangle{2});
@@ -497,11 +496,16 @@ handles.annotationLayers.pointLayer = repmat(struct('n', 0, 'point', zeros(maxPo
 handles.annotationLayers.divisionLayer = repmat(struct('point', zeros(maxPointsPerImage,2),'cell_id', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
 handles.annotationLayers.trackLayer = repmat(struct('point', zeros(maxPointsPerImage,2), 'value', zeros(maxPointsPerImage,1), 'cell', zeros(maxPointsPerImage,1)), handles.dataLength, 1);
 
+newHeight = max(min(handles.maxHeight, str2double(get(handles.canvasHeightText, 'String'))), handles.minHeight);
+newWidth = max(min(handles.maxWidth, str2double(get(handles.canvasWidthText, 'String'))), handles.minWidth);
+newHeight = min(newHeight, size(IM,1));
+newWidth = min(newWidth, size(IM,2));
+
 currentAxesUnits = get(handles.imageCanvas, 'Units');
 set(handles.imageCanvas, 'Units', 'Pixels');
 canvasPosition = get(handles.imageCanvas, 'Position');
 handles.canvasSize = [canvasPosition(4), canvasPosition(3)];
-definedSize = [min(size(IM,1), handles.maxHeight), min(size(IM,2), handles.maxWidth)]; 
+definedSize = [newHeight, newWidth]; 
 handles.definedSizePixels = definedSize; 
 canvasPosition(3) = definedSize(2);
 canvasPosition(4) = definedSize(1);
@@ -511,18 +515,6 @@ set(handles.imageCanvas, 'Units', currentAxesUnits);
 subImage = IM(handles.imorigin(2):(handles.imorigin(2) + handles.definedSizePixels(1)-1), handles.imorigin(1):(handles.imorigin(1) + handles.definedSizePixels(2)-1));
 handles.implot = image(im2uint8(subImage));
 hold(handles.imageCanvas);
-% DISPLAY OPTION 2
-% greenMask = im2uint8(cat(3, ones(size(subImage))*0.3, ones(size(subImage))*1, ones(size(subImage))*0.3));
-% handles.highlightLayer = image(greenMask);
-% set(handles.highlightLayer, 'AlphaData', zeros(size(subImage)));
-% hold(handles.imageCanvas);
-% hold(handles.imageCanvas);
-% redMask = im2uint8(cat(3, ones(size(subImage))*0.3, ones(size(subImage))*1, ones(size(subImage))*0.3));
-% handles.selectionLayer = image(redMask);
-% set(handles.selectionLayer, 'AlphaData', zeros(size(subImage)));
-
-%handles.axisH = plot(xlim, [uint16(size(subImage,2)/2), uint16(size(subImage,2)/2)]);
-%handles.axisV = plot([uint16(size(subImage,1)/2), uint16(size(subImage,1)/2)], ylim);
 hold(handles.imageCanvas);
 
 handles.definedSize = getObjectPosition(handles.imageCanvas, [3,4]);
@@ -922,8 +914,10 @@ if(isInsideCoordinates(currentPoint, imageCanvasPosition))
                 %fprintf('Displacement: %d,%d\t%d,%d\t%d,%d\n', displacement(1), displacement(2), previousOrigin(1), previousOrigin(2), handles.imorigin(1), handles.imorigin(2));
                 imageCanvas_refreshImage(handles);
                 drawnow;
-                if(getSliderIndex(handles) > 1)
+                if(getSliderIndex(handles) > 1 && get(handles.trackingModeCheckbox, 'Value'))
                     imageCanvas_setImage(handles, getSliderIndex(handles) - 1);
+                elseif(getSliderIndex(handles) < handles.dataLength && ~get(handles.trackingModeCheckbox, 'Value'))
+                    imageCanvas_setImage(handles, getSliderIndex(handles) + 1);
                 end
             end
         end
@@ -1185,3 +1179,87 @@ function divisionToogleButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of divisionToogleButton
+
+
+% --- Executes on button press in trackingModeCheckbox.
+function trackingModeCheckbox_Callback(hObject, eventdata, handles)
+% hObject    handle to trackingModeCheckbox (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of trackingModeCheckbox
+
+
+
+function canvasWidthText_Callback(hObject, eventdata, handles)
+% hObject    handle to canvasWidthText (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of canvasWidthText as text
+%        str2double(get(hObject,'String')) returns contents of canvasWidthText as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function canvasWidthText_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to canvasWidthText (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function canvasHeightText_Callback(hObject, eventdata, handles)
+% hObject    handle to canvasHeightText (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of canvasHeightText as text
+%        str2double(get(hObject,'String')) returns contents of canvasHeightText as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function canvasHeightText_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to canvasHeightText (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in setCanvasSizeButton.
+function setCanvasSizeButton_Callback(hObject, eventdata, handles)
+% hObject    handle to setCanvasSizeButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+newHeight = max(min(handles.maxHeight, str2double(get(handles.canvasHeightText, 'String'))), handles.minHeight);
+newWidth = max(min(handles.maxWidth, str2double(get(handles.canvasWidthText, 'String'))), handles.minWidth);
+
+handles.canvasSize = [newHeight, newWidth];
+currentAxesUnits = get(handles.imageCanvas, 'Units');
+set(handles.imageCanvas, 'Units', 'Pixels');
+definedSize = [newHeight, newWidth];
+handles.definedSizePixels = definedSize; 
+changeObjectPosition(handles.imageCanvas, 3:4, definedSize([2,1]));
+set(handles.imageCanvas, 'Units', currentAxesUnits);
+handles.definedSize = getObjectPosition(handles.imageCanvas, [3:4]);
+
+handles.imorigin = evaluateNewOrigin(handles, handles.imorigin);
+guidata(hObject, handles);
+setappdata(handles.figure1, 'xloc', 1);
+setappdata(handles.figure1, 'yloc', 1);
+subImage = prepareOverlayImage(handles);
+handles.implot = image(subImage);
+set(handles.implot, 'ButtonDownFcn', {@imageCanvas_ButtonDownFcn, handles});
+
+organizeLayout(handles);
+guidata(hObject, handles);
